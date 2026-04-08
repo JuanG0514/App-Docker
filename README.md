@@ -1,78 +1,59 @@
-# 🏪 Sistema de Inventario — Despliegue con Docker
+# Sistema de Inventario — Despliegue con Docker
 
-Aplicación web completa de gestión de inventario desplegada con contenedores Docker sin docker-compose.
-Arquitectura de tres capas: **React + Vite** (frontend) → **Spring Boot** (backend) → **MySQL** (base de datos).
+Este proyecto es una aplicación web para gestionar inventarios.
+Está construida con una arquitectura de tres capas usando contenedores Docker:
 
----
+* Frontend (React)
+* Backend (Spring Boot)
+* Base de datos (MySQL)
 
-## 🧰 Tecnologías utilizadas
-
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React 18 + Vite 5, Axios |
-| Servidor web | Nginx (proxy inverso incluido) |
-| Backend | Spring Boot 3.2, Spring Data JPA |
-| Base de datos | MySQL 8.0 |
-| Contenerización | Docker (multi-stage builds) |
+Todo se ejecuta con Docker, sin usar docker-compose.
 
 ---
 
-## 📁 Estructura del repositorio
+## Tecnologías utilizadas
 
-```
+| Parte         | Tecnología        |
+| ------------- | ----------------- |
+| Frontend      | React 18 + Vite 5 |
+| Servidor web  | Nginx             |
+| Backend       | Spring Boot 3.2   |
+| Base de datos | MySQL 8           |
+| Contenedores  | Docker            |
+
+---
+
+## Estructura del proyecto
+
+```bash
 /
 ├── back/
-│   ├── src/
-│   │   └── main/
-│   │       ├── java/com/inventario/api/
-│   │       │   ├── ApiApplication.java
-│   │       │   ├── config/CorsConfig.java
-│   │       │   ├── controller/ProductoController.java
-│   │       │   ├── model/Producto.java
-│   │       │   ├── repository/ProductoRepository.java
-│   │       │   └── service/ProductoService.java
-│   │       └── resources/
-│   │           └── application.properties
-│   ├── Dockerfile
-│   ├── init.sql
-│   └── pom.xml
 ├── front/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ProductoForm.jsx
-│   │   │   └── ProductoList.jsx
-│   │   ├── services/
-│   │   │   └── productoService.js
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
 └── README.md
 ```
 
----
-
-## 🚀 Despliegue paso a paso
-
-> **Requisito previo:** tener Docker instalado y corriendo.  
-> Ejecuta todos los comandos desde la **raíz del repositorio**.
+* `back/` contiene la API en Spring Boot
+* `front/` contiene la interfaz en React
 
 ---
 
-### Paso 1 — Crear las redes Docker
+## Cómo ejecutar el proyecto
 
-Se necesitan dos redes: una entre frontend y backend, y otra entre backend y base de datos.
+**Requisito:** Tener Docker instalado y en ejecución.
+Ejecutar todos los comandos desde la raíz del proyecto.
+
+---
+
+### Paso 1 — Crear redes Docker
+
+Se crean dos redes para la comunicación entre contenedores:
 
 ```bash
 docker network create red-front-back
 docker network create red-back-bd
 ```
 
-Verificar que se crearon:
+Verificar:
 
 ```bash
 docker network ls
@@ -80,9 +61,9 @@ docker network ls
 
 ---
 
-### Paso 2 — Crear el volumen para la base de datos
+### Paso 2 — Crear volumen para MySQL
 
-El volumen persiste los datos aunque el contenedor se elimine.
+Permite persistir los datos de la base de datos:
 
 ```bash
 docker volume create volumen-mysql
@@ -96,86 +77,80 @@ docker volume ls
 
 ---
 
-### Paso 3 — Construir la imagen del Backend
+### Paso 3 — Construir imagen del Backend
 
 ```bash
 docker build -t imagen-backend ./back
 ```
 
-> Este proceso descarga las dependencias de Maven y compila el JAR.  
-> La primera vez puede tardar 3-5 minutos.
+Este proceso puede tardar unos minutos la primera vez.
 
 ---
 
-### Paso 4 — Construir la imagen del Frontend
+### Paso 4 — Construir imagen del Frontend
 
 ```bash
 docker build -t imagen-frontend ./front
 ```
 
-> Instala dependencias npm y ejecuta `vite build` para generar los archivos estáticos.
-
 ---
 
-### Paso 5 — Ejecutar el contenedor de Base de Datos
+### Paso 5 — Levantar la Base de Datos
+
+En Windows se recomienda ejecutar en una sola línea:
 
 ```bash
-docker run -d \
-  --name bd \
-  --network red-back-bd \
-  -e MYSQL_ROOT_PASSWORD=root1234 \
-  -e MYSQL_DATABASE=inventario_db \
-  -e MYSQL_USER=inventario_user \
-  -e MYSQL_PASSWORD=inventario_pass \
-  -v volumen-mysql:/var/lib/mysql \
-  -p 3306:3306 \
-  mysql:8.0
+docker run -d --name bd --network red-back-bd -e MYSQL_ROOT_PASSWORD=root1234 -e MYSQL_DATABASE=inventario_db -e MYSQL_USER=inventario_user -e MYSQL_PASSWORD=inventario_pass -v volumen-mysql:/var/lib/mysql -p 3307:3306 mysql:8.0
 ```
 
-Esperar ~20 segundos a que MySQL termine de iniciar. Verificar que está listo:
+Esperar unos segundos a que inicie.
+
+Verificar:
 
 ```bash
 docker logs bd
 ```
 
-Cuando veas `ready for connections` en los logs, continúa al siguiente paso.
+Cuando aparezca el mensaje:
+
+```
+ready for connections
+```
+
+la base de datos está lista.
 
 ---
 
-### Paso 6 — Ejecutar el contenedor del Backend
+### Paso 6 — Levantar el Backend
 
 ```bash
-docker run -d \
-  --name backend \
-  --network red-back-bd \
-  -p 3000:3000 \
-  imagen-backend
+docker run -d --name backend --network red-back-bd -p 3000:3000 imagen-backend
 ```
 
-Conectar también el backend a la red del frontend:
+Conectar el backend a la red del frontend:
 
 ```bash
 docker network connect red-front-back backend
 ```
 
-Verificar que Spring Boot arrancó correctamente:
+Verificar:
 
 ```bash
 docker logs backend
 ```
 
-Debes ver: `Started ApiApplication` en los logs.
+Debe aparecer:
+
+```
+Started ApiApplication
+```
 
 ---
 
-### Paso 7 — Ejecutar el contenedor del Frontend
+### Paso 7 — Levantar el Frontend
 
 ```bash
-docker run -d \
-  --name frontend \
-  --network red-front-back \
-  -p 80:80 \
-  imagen-frontend
+docker run -d --name frontend --network red-front-back -p 80:80 imagen-frontend
 ```
 
 ---
@@ -186,103 +161,81 @@ docker run -d \
 docker ps
 ```
 
-Deberías ver los tres contenedores (`bd`, `backend`, `frontend`) con estado `Up`.
+Deben aparecer los contenedores:
 
-Abre el navegador en: **http://localhost**
+* bd
+* backend
+* frontend
+
+Todos en estado `Up`.
 
 ---
 
-## 🔍 Comandos útiles de verificación
+## Probar la aplicación
+
+Abrir en el navegador:
+
+```
+http://localhost
+```
+
+---
+
+## Comandos útiles
+
+Ver logs:
 
 ```bash
-# Ver logs de cualquier contenedor
 docker logs bd
 docker logs backend
 docker logs frontend
+```
 
-# Inspeccionar las redes
+Ver redes:
+
+```bash
 docker network inspect red-front-back
 docker network inspect red-back-bd
+```
 
-# Probar el API directamente
+Probar API:
+
+```bash
 curl http://localhost:3000/productos
 curl http://localhost/api/productos
 ```
 
 ---
 
-## 🗄️ Conectar con MySQL Workbench (opcional)
-
-Como el contenedor `bd` expone el puerto `3306`, puedes conectarte desde MySQL Workbench:
-
-| Campo | Valor |
-|-------|-------|
-| Host | 127.0.0.1 |
-| Puerto | 3306 |
-| Usuario | inventario_user |
-| Contraseña | inventario_pass |
-| Base de datos | inventario_db |
-
-> También puedes ejecutar el script `back/init.sql` en Workbench para insertar datos de ejemplo.
-
----
-
-## 🧹 Limpieza (eliminar todo)
+## Limpieza (eliminar todo)
 
 ```bash
-# Detener y eliminar contenedores
 docker stop frontend backend bd
 docker rm frontend backend bd
 
-# Eliminar imágenes
 docker rmi imagen-frontend imagen-backend
 
-# Eliminar redes
 docker network rm red-front-back red-back-bd
 
-# Eliminar volumen (ATENCIÓN: borra todos los datos)
 docker volume rm volumen-mysql
 ```
 
----
-
-## 🏗️ Arquitectura
-
-```
-Usuario
-  │
-  ▼
-[frontend :80]  ──── red-front-back ────  [backend :3000]
-  Nginx                                    Spring Boot
-  React SPA                                    │
-  Proxy /api/ ─────────────────────────────────┘
-                                               │
-                                    red-back-bd
-                                               │
-                                         [bd :3306]
-                                           MySQL
-                                       volumen-mysql
-```
+Este proceso elimina todo, incluyendo los datos de la base de datos.
 
 ---
 
-## 📡 Endpoints del API
+## Arquitectura 
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/productos` | Listar todos |
-| GET | `/productos/{id}` | Obtener por ID |
-| POST | `/productos` | Crear producto |
-| PUT | `/productos/{id}` | Actualizar producto |
-| DELETE | `/productos/{id}` | Eliminar producto |
-
-**Ejemplo de cuerpo para POST/PUT:**
-```json
-{
-  "nombre": "Laptop Dell",
-  "descripcion": "Intel Core i5, 8GB RAM",
-  "precio": 2800000,
-  "stock": 10,
-  "categoria": "Electrónica"
-}
 ```
+Usuario → Frontend (React + Nginx)
+        → Backend (Spring Boot)
+        → Base de datos (MySQL)
+```
+
+El frontend se comunica con el backend, y el backend con la base de datos mediante redes Docker.
+
+---
+
+## Nota final
+
+Este proyecto muestra cómo desplegar una aplicación completa usando Docker de forma manual, sin docker-compose, entendiendo cómo se conectan los contenedores entre sí.
